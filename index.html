@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Quiz TKJ Interaktif — Adit</title>
+<style>
+/* ---------------- global ---------------- */
+*{ margin:0; padding:0; box-sizing:border-box; font-family: "Poppins", sans-serif; }
+body{
+    background: linear-gradient(180deg,#0f1724 0%, #122032 100%);
+    height:100vh; display:flex; justify-content:center; align-items:center; padding:18px; color:#fff;
+    overflow:hidden;
+}
+
+/* ---------------- container screens ---------------- */
+.container{
+    width:100%; max-width:520px; border-radius:18px; box-shadow:0 18px 40px rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    padding:20px;
+}
+
+/* screen */
+.screen{ display:none; padding:10px; animation:pop .35s ease; border-radius:12px; }
+.screen.show{ display:block; }
+
+@keyframes pop { from{ transform:scale(.98); opacity:0 } to{ transform:scale(1); opacity:1 } }
+
+/* title */
+.title{ text-align:center; font-size:26px; font-weight:800; margin:10px 0 16px 0; color:#fff; }
+
+/* buttons */
+.btn{
+    display:inline-block; width:100%; padding:12px 14px; border-radius:12px; border:none; cursor:pointer;
+    font-weight:700; font-size:16px; margin:8px 0;
+    transition:transform .14s ease, box-shadow .14s ease;
+    background: linear-gradient(90deg,#f59e0b, #fb923c); color:#071022;
+    box-shadow:0 8px 20px rgba(245,158,11,0.15);
+}
+.btn:hover{ transform:translateY(-4px); box-shadow:0 14px 30px rgba(0,0,0,0.35); }
+.btn.ghost{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.08); }
+
+/* quiz area */
+#question{ font-size:18px; margin-bottom:14px; color:#e6eef8; }
+
+/* timer + progress */
+.top-row{ display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+#timerBox{ background:rgba(255,255,255,0.04); padding:8px 10px; border-radius:10px; min-width:92px; text-align:center; font-weight:700; }
+#timer{ font-size:18px; color:#ffd47a; }
+#progressWrap{ flex:1; height:10px; background:rgba(255,255,255,0.04); border-radius:999px; overflow:hidden; }
+#progressBar{ width:0%; height:100%; background:linear-gradient(90deg,#60a5fa,#4f46e5); transition:width .35s ease; }
+
+/* options */
+.options{ margin-top:6px; display:flex; flex-direction:column; gap:10px; }
+.option{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    padding:12px 14px; border-radius:10px; cursor:pointer; 
+    border:1px solid rgba(255,255,255,0.04); color:#e6eef8;
+    transition:.15s;
+}
+.option:hover{ transform:scale(1.02); background: rgba(255,255,255,0.04); }
+.option.correct{ background: linear-gradient(90deg,#16a34a,#86efac); color:#022c10; }
+.option.wrong{ background: linear-gradient(90deg,#ef4444,#ffc7c7); color:#360d0d; }
+
+/* end screen */
+#finalScore{ font-size:20px; font-weight:800; margin:10px 0; color:#a7f3d0; }
+.small{ font-size:13px; color:rgba(255,255,255,0.7); }
+
+@media (max-width:420px){
+    .container{ padding:16px; }
+    .title{ font-size:20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- audio (sound effects + custom BGM) -->
+    <audio id="sndClick" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_f4669b5321.mp3?filename=ui-click-110794.mp3"></audio>
+    <audio id="sndCorrect" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_d3c7f5c52e.mp3?filename=successful-2-49321.mp3"></audio>
+    <audio id="sndWrong" src="https://cdn.pixabay.com/download/audio/2021/09/20/audio_4f1d4125e1.mp3?filename=wrong-answer-126536.mp3"></audio>
+
+    <!-- CUSTOM MUSIC FILE -->
+    <audio id="bgm" src="Musik.mp3" loop></audio>
+
+    <!-- START SCREEN -->
+    <div id="startScreen" class="screen show">
+        <div class="title">Quiz TKJ Interaktif 🔧</div>
+
+        <p class="small" style="text-align:center; margin-bottom:12px;">
+            Belajar sambil main — pilih jawaban & kumpulkan skor!
+        </p>
+
+        <button class="btn" onclick="startGame()">Mulai Quiz</button>
+        <button class="btn ghost" onclick="tutorial()">Cara Bermain</button>
+        <button class="btn ghost" id="btnToggleBGM" onclick="toggleBGM()">BGM: OFF</button>
+
+        <div style="display:flex; gap:8px; margin-top:10px;">
+            <button class="btn ghost" style="flex:1;" onclick="show('quizScreen'); startGame();">Langsung Main</button>
+            <button class="btn ghost" style="flex:1;" onclick="show('endScreen'); showHighScore()">Lihat High Score</button>
+        </div>
+    </div>
+
+    <!-- TUTORIAL -->
+    <div id="tutorialScreen" class="screen">
+        <div class="title">Cara Bermain 📘</div>
+        <p class="small">• Pilih jawaban terbaik.</p>
+        <p class="small">• Waktu 10 detik/soal.</p>
+        <p class="small">• Skor & High Score tersimpan otomatis.</p>
+        <p class="small">• Bisa mute sound & hidupkan musik.</p>
+
+        <button class="btn" onclick="backToStart()">Kembali</button>
+    </div>
+
+    <!-- QUIZ -->
+    <div id="quizScreen" class="screen">
+        <div class="top-row">
+            <div id="timerBox">Waktu: <span id="timer">10</span>s</div>
+            <div id="progressWrap"><div id="progressBar"></div></div>
+        </div>
+
+        <div id="question"></div>
+        <div id="options" class="options"></div>
+        <div id="status"></div>
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="nextBtn" class="btn" onclick="nextQuestion()">NEXT</button>
+            <button class="btn ghost" id="muteBtn" onclick="toggleMute()">SOUND: ON</button>
+        </div>
+
+        <div id="scoreBoard" style="margin-top:10px; font-weight:800;">Skor: 0</div>
+    </div>
+
+    <!-- END SCREEN -->
+    <div id="endScreen" class="screen">
+        <div class="title">Hasil Akhir 🏁</div>
+
+        <div id="finalScore">Skor Kamu: 0</div>
+        <div id="highScoreText" class="small">High Score: 0</div>
+
+        <button class="btn" onclick="startGame()">Main Lagi</button>
+        <button class="btn ghost" onclick="backToStart()">Menu Utama</button>
+    </div>
+
+</div>
+
+<script>
+/* ================= SOAL ================= */
+const questions = [
+    { q:"Apa fungsi utama router?", a:["Pembagi IP","Menyimpan data","Pemberi listrik","Menambah RAM"], correct:0 },
+    { q:"Kabel LAN yang paling umum digunakan?", a:["HDMI","UTP","USB","Fiber"], correct:1 },
+    { q:"IP default router seringkali adalah?", a:["192.168.1.1","10.0.0.200","8.8.8.8","172.16.0.1"], correct:0 },
+    { q:"Perangkat penghubung banyak perangkat dalam LAN?", a:["Switch","SSD","Printer","UPS"], correct:0 },
+    { q:"Media transmisi tercepat:", a:["UTP","Fiber Optic","Coaxial","Bluetooth"], correct:1 },
+    { q:"Alamat MAC digunakan untuk?", a:["Identifikasi perangkat","Menyimpan file","Menentukan DNS","Menyimpan IP"], correct:0 },
+    { q:"Standar warna kabel LAN:", a:["T568B","RGB","CMYK","EIA-232"], correct:0 },
+    { q:"Fungsi modem:", a:["Digital ↔ Analog","Sebar WiFi","Simpan data","Cek virus"], correct:0 },
+    { q:"Port LAN memakai konektor:", a:["RJ45","USB","VGA","HDMI"], correct:0 },
+    { q:"Fiber Optic memakai media:", a:["Cahaya","Listrik","Suara","Radio"], correct:0 }
+];
+
+let index = 0;
+let score = 0;
+let canAnswer = true;
+let timerInterval;
+let timeLeft = 10;
+
+let isMuted = false;
+let isBgmOn = false;
+
+const sndClick = document.getElementById("sndClick");
+const sndCorrect = document.getElementById("sndCorrect");
+const sndWrong = document.getElementById("sndWrong");
+const bgm = document.getElementById("bgm");
+
+/* musik + sound rule */
+function updateAudioState(){
+    if(isMuted){
+        sndClick.muted = sndCorrect.muted = sndWrong.muted = true;
+        bgm.pause();
+    } else {
+        sndClick.muted = sndCorrect.muted = sndWrong.muted = false;
+        if(isBgmOn) bgm.play().catch(()=>{});
+    }
+}
+
+function toggleMute(){
+    isMuted = !isMuted;
+    document.getElementById("muteBtn").innerText = isMuted ? "SOUND: OFF" : "SOUND: ON";
+    updateAudioState();
+}
+
+function toggleBGM(){
+    isBgmOn = !isBgmOn;
+    document.getElementById("btnToggleBGM").innerText = isBgmOn ? "BGM: ON" : "BGM: OFF";
+    updateAudioState();
+}
+
+/* efek click */
+document.querySelectorAll(".btn").forEach(b => b.addEventListener("click", ()=>{
+    if(!isMuted){ sndClick.currentTime=0; sndClick.play().catch(()=>{}); }
+}));
+
+function show(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+    document.getElementById(id).classList.add('show');
+}
+
+/* TIMER */
+function startTimer(){
+    clearInterval(timerInterval);
+    timeLeft = 10;
+    document.getElementById("timer").innerText = timeLeft;
+
+    timerInterval = setInterval(()=>{
+        timeLeft--;
+        document.getElementById("timer").innerText = timeLeft;
+        if(timeLeft<=0){
+            clearInterval(timerInterval);
+            autoWrong();
+        }
+    },1000);
+}
+
+function autoWrong(){
+    canAnswer=false;
+    const correct = questions[index].correct;
+    const ops=document.querySelectorAll(".option");
+    ops[correct].classList.add("correct");
+    document.getElementById("status").innerText="Waktu Habis ❌";
+    if(!isMuted) sndWrong.play().catch(()=>{});
+}
+
+/* LOAD QUESTION */
+function loadQuestion(){
+    canAnswer=true;
+    document.getElementById("status").innerText="";
+
+    const q = questions[index];
+    document.getElementById("question").innerText = (index+1)+". "+q.q;
+
+    document.getElementById("options").innerHTML = q.a.map((opt,i)=>
+        `<div class="option" onclick="choose(${i})">${opt}</div>`
+    ).join('');
+
+    document.getElementById("scoreBoard").innerText = "Skor: "+score;
+
+    const percent = (index/questions.length)*100;
+    document.getElementById("progressBar").style.width = percent+"%";
+
+    startTimer();
+}
+
+/* CHOOSE */
+function choose(i){
+    if(!canAnswer) return;
+    canAnswer=false;
+    clearInterval(timerInterval);
+
+    const q = questions[index];
+    const ops=document.querySelectorAll(".option");
+
+    if(i==q.correct){
+        ops[i].classList.add("correct");
+        score++;
+        document.getElementById("status").innerText="Benar 👍";
+        if(!isMuted) sndCorrect.play().catch(()=>{});
+    } else {
+        ops[i].classList.add("wrong");
+        ops[q.correct].classList.add("correct");
+        document.getElementById("status").innerText="Salah ❌";
+        if(!isMuted) sndWrong.play().catch(()=>{});
+    }
+
+    document.getElementById("scoreBoard").innerText="Skor: "+score;
+}
+
+/* NEXT */
+function nextQuestion(){
+    if(canAnswer){
+        clearInterval(timerInterval);
+        autoWrong();
+    }
+    index++;
+    if(index>=questions.length) return endGame();
+    loadQuestion();
+}
+
+/* END GAME */
+function endGame(){
+    clearInterval(timerInterval);
+    show("endScreen");
+
+    document.getElementById("finalScore").innerText = `Skor Kamu: ${score} / ${questions.length}`;
+
+    const prev = localStorage.getItem("quizTKJ_highScore") || 0;
+    if(score > prev) localStorage.setItem("quizTKJ_highScore", score);
+
+    const hs = localStorage.getItem("quizTKJ_highScore") || 0;
+    document.getElementById("highScoreText").innerText = `High Score: ${hs} / ${questions.length}`;
+}
+
+/* START */
+function startGame(){
+    index=0; score=0;
+    show("quizScreen");
+    loadQuestion();
+}
+
+/* MENU */
+function tutorial(){ show("tutorialScreen"); }
+function backToStart(){ clearInterval(timerInterval); show("startScreen"); }
+
+/* INIT */
+document.addEventListener("DOMContentLoaded", ()=>{
+    show("startScreen");
+});
+</script>
+
+</body>
+</html>
